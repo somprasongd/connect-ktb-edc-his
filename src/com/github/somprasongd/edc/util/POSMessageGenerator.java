@@ -1,0 +1,343 @@
+/*
+ * To change this license header, choose License Headers in Project Properties.
+ * To change this template file, choose Tools | Templates
+ * and open the template in the editor.
+ */
+package com.github.somprasongd.edc.util;
+
+import java.math.RoundingMode;
+import java.text.DecimalFormat;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.LinkedHashMap;
+import java.util.List;
+
+/**
+ *
+ * @author sompr
+ */
+public class POSMessageGenerator {
+
+    public static String getSaleText(String txCode, double amount,
+            String ownerCardNo, String childCardNo, String foreignerCardNo) {
+        if (!isValidSaleTxCode(txCode)) {
+            return null;
+        }
+
+//        // POS Interface massage spec. V 1.10
+//        if (amount == null || amount.isEmpty()) {
+//            amount = "000000000000";
+//        }
+//        if (ownerCardNo == null || ownerCardNo.isEmpty()) {
+//            ownerCardNo = "0000000000000";
+//        }
+//        if (childCardNo == null || childCardNo.isEmpty()) {
+//            childCardNo = "0000000000000";
+//        }
+//        if (foreignerCardNo == null || foreignerCardNo.isEmpty()) {
+//            foreignerCardNo = "B000000000000";
+//        }
+        String messageData = "";
+
+        DecimalFormat formatter = new DecimalFormat("#.00");
+        formatter.setRoundingMode(RoundingMode.DOWN);
+        String amountString = formatter.format(amount);
+
+        if (amountString != null && !amountString.isEmpty()) {
+            String M_FieldType = "34 30";
+            String M_LenFieldData = "00 12";
+            String textB_40 = padLeft(12, "0", amountString.replace(".", ""));
+            String M_AmtData = HexConverter.asciiToHexWithSpace(textB_40);
+            String M_AmtSeparator = "1C";
+            messageData += " " + M_FieldType + " " + M_LenFieldData + " " + M_AmtData + " " + M_AmtSeparator;
+        }
+
+        if (childCardNo != null && !childCardNo.isEmpty()) {
+            String M_FieldType_Sale71 = "37 31";
+            String M_LenFieldData_Sale71 = "00 13";
+            String textB_Sale71 = padLeft(13, "0", childCardNo);
+            String M_Sale71Data = HexConverter.asciiToHexWithSpace(textB_Sale71);
+            String M_AmtSeparator_Sale71 = "1C";
+            messageData += " " + M_FieldType_Sale71 + " " + M_LenFieldData_Sale71 + " " + M_Sale71Data + " " + M_AmtSeparator_Sale71;
+        }
+
+        if (foreignerCardNo != null && !foreignerCardNo.isEmpty()) {
+            String M_FieldType_Sale72 = "37 32";
+            String M_LenFieldData_Sale72 = "00 13";
+            String textB_Sale72 = padLeft(13, "0", foreignerCardNo);
+            String M_Sale72Data = HexConverter.asciiToHexWithSpace(textB_Sale72);
+            String M_AmtSeparator_Sale72 = "1C";
+            messageData += " " + M_FieldType_Sale72 + " " + M_LenFieldData_Sale72 + " " + M_Sale72Data + " " + M_AmtSeparator_Sale72;
+        }
+
+        if (ownerCardNo != null && !ownerCardNo.isEmpty()) {
+            String M_FieldType_Sale73 = "37 33";
+            String M_LenFieldData_Sale73 = "00 13";
+            String textB_Sale73 = padLeft(13, "0", ownerCardNo);
+            String M_Sale73Data = HexConverter.asciiToHexWithSpace(textB_Sale73);
+            String M_AmtSeparator_Sale73 = "1C";
+            messageData += " " + M_FieldType_Sale73 + " " + M_LenFieldData_Sale73 + " " + M_Sale73Data + " " + M_AmtSeparator_Sale73;
+        }
+
+        return genText(txCode, messageData);
+    }
+
+    private static boolean isValidSaleTxCode(String code) {
+        String[] saleTxCodes = new String[]{
+            "11", // ผู้ป่วยนอกทั่วไป สิทธิตนเองและครอบครัว
+            "12", // ผู้ป่วยนอกทั่วไป สิทธิบุตร 0-7 ปี
+            "13", // ผู้ป่ายนอกทั่วไป สิทธิคู่สมรสต่างชาติ
+            "14", // ผู้ป่วยนอกทั่วไป ไม่สามารถใช้บัตรได้
+            "21", // หน่วยไตเทียม สิทธิตนเองและครอบครัว
+            "22", // หน่วยไตเทียม สิทธิบุตร 0-7 ปี
+            "23", // หน่วยไตเทียม สิทธิคู่สมรสต่างชาติ
+            "24", // หน่วยไตเทียม ไม่สามารถใช้บัตรได้
+            "31", // หน่วยรังสีผู้เป็นมะเร็ง สิทธิตนเองและครอบครัว
+            "32", // หน่วยรังสีผู้เป็นมะเร็ง สิทธิบุตร 0-7 ปี
+            "33", // หน่วยรังสีผู้เป็นมะเร็ง สิทธิคู่สมรสต่างชาติ
+            "34" // หน่วยรังสีผู้เป็นมะเร็ง ไม่สามารถใช้บัตรได้
+        };
+        return Arrays.asList(saleTxCodes).contains(code);
+    }
+
+    public static String getVoidText(String invoiceNumber) {
+        if (invoiceNumber == null || invoiceNumber.isEmpty()) {
+            return null;
+        }
+        String messageData = "";
+        String M_FieldType_VoidTrace = "36 35";
+        String M_LenFieldData_VoidTrace = "00 06";
+        String textB_VoidTrace = padLeft(6, "0", invoiceNumber);
+        String M_VoidTraceData = HexConverter.asciiToHexWithSpace(textB_VoidTrace);
+        String M_AmtSeparator_VoidTrace = "1C";
+        messageData += " " + M_FieldType_VoidTrace + " " + M_LenFieldData_VoidTrace + " " + M_VoidTraceData + " " + M_AmtSeparator_VoidTrace;
+
+        // 26 = Void
+        return genText("26", messageData);
+    }
+
+    public static String getRePrintText(String invoiceNumber) {
+        if (invoiceNumber == null || invoiceNumber.isEmpty()) {
+            return null;
+        }
+        String messageData = "";
+        String M_FieldType_RePrintTrace = "36 35";
+        String M_LenFieldData_RePrintTrace = "00 06";
+        String textB_RePrintTrace = padLeft(6, "0", invoiceNumber);
+        String M_RePrintTraceData = HexConverter.asciiToHexWithSpace(textB_RePrintTrace);
+        String M_AmtSeparator_RePrintTrace = "1C";
+        messageData += " " + M_FieldType_RePrintTrace + " " + M_LenFieldData_RePrintTrace + " " + M_RePrintTraceData + " " + M_AmtSeparator_RePrintTrace;
+
+        // 92 = re print
+        return genText("92", messageData);
+    }
+    
+    public static String getSettlementText() {
+        return "02 00 18 30 30 30 30 30 30 30 30 30 30 31 30 35 30 30 30 30 1C 03 32";
+    }
+
+    /**
+     * Format STX + LENGTH + MESSAGE DATA(Reserve + Presentation Header + Field
+     * Data) + ETX + LRC
+     *
+     * @param txCode
+     * @param messageData
+     * @return
+     */
+    private static String genText(String txCode, String messageData) {
+        String H_STX = "02";
+        String H_Reserve = "30 30 30 30 30 30 30 30 30 30";
+        String H_FormatVer = "31";
+        String H_ReqRespIndcstor = "30"; // 0 = Request
+        String H_TransCode = HexConverter.asciiToHexWithSpace(txCode);
+        String H_RespCode = "30 30";
+        String H_MoreDataIndicator = "30";
+        String H_FieldSeparator = "1C";
+
+        String T_ETX = "03";
+
+        String M_Data = messageData.trim();
+
+        String H_Data = H_STX + " " + getLengthData(M_Data) + " " + H_Reserve + " " + H_FormatVer + " " + H_ReqRespIndcstor + " " + H_TransCode + " " + H_RespCode + " " + H_MoreDataIndicator + " " + H_FieldSeparator;
+
+        String T_Data = T_ETX;
+        String XORCHK = GetXOR(H_Data + " " + M_Data + " " + T_Data);
+        String T_XorStxEtx = HexConverter.binaryToHex(XORCHK.substring(0, 4)) + HexConverter.binaryToHex(XORCHK.substring(4, 8));
+
+        String text = H_Data + " " + M_Data + " " + T_Data + " " + T_XorStxEtx;
+        return text;
+    }
+
+    public static LinkedHashMap<String, Object> getMessageObject(String messagePOS) {
+        LinkedHashMap<String, Object> lhm = new LinkedHashMap<String, Object>();
+        try {
+            String txtMsgPOS = messagePOS.trim().replace(" ", "");
+
+            String H_STX = txtMsgPOS.substring(0, 2);//"02";
+            lhm.put("STX", H_STX);
+
+            String H_Length = txtMsgPOS.substring(2, 6);//"00 35";
+            lhm.put("Length", H_Length);
+
+            String H_Reserve = txtMsgPOS.substring(6, 26);//"30 30 30 30 30 30 30 30 30 30";
+            lhm.put("Reserve", H_Reserve);
+            lhm.put("Reserve_Value", HexConverter.hexToASCII(H_Reserve));
+
+            String H_FormatVer = txtMsgPOS.substring(26, 28);//"31";
+            lhm.put("FormatVer", H_FormatVer);
+            lhm.put("FormatVer_Value", HexConverter.hexToASCII(H_FormatVer));
+
+            String H_ReqRespIndcstor = txtMsgPOS.substring(28, 30);//"30";
+            lhm.put("ReqRespIndcstor", H_ReqRespIndcstor);
+            lhm.put("ReqRespIndcstor_Value", HexConverter.hexToASCII(H_ReqRespIndcstor));
+
+            String H_TransCode = txtMsgPOS.substring(30, 34);//"32 30";
+            lhm.put("TransCode", H_TransCode);
+            lhm.put("TransCode_Value", HexConverter.hexToASCII(H_TransCode));
+
+            String H_RespCode = txtMsgPOS.substring(34, 38);//"30 30";
+            lhm.put("RespCode", H_RespCode);
+            lhm.put("RespCode_Value", HexConverter.hexToASCII(H_RespCode));
+
+            String H_MoreDataIndicator = txtMsgPOS.substring(38, 40);//"30";
+            lhm.put("MoreDataIndicator", H_MoreDataIndicator);
+            lhm.put("MoreDataIndicator_Value", HexConverter.hexToASCII(H_MoreDataIndicator));
+
+            String H_FieldSeparator = txtMsgPOS.substring(40, 42);//"1C";
+            lhm.put("FieldSeparator", H_FieldSeparator);
+
+            String F_Data = txtMsgPOS.substring(42, (txtMsgPOS.length() - 46) + 42);
+            String[] F_Datas = F_Data.toLowerCase().split("1c");
+            List<LinkedHashMap<String, String>> fieldDatas = new ArrayList<LinkedHashMap<String, String>>();
+            for (String fieldData : F_Datas) {
+                LinkedHashMap<String, String> lhm1 = new LinkedHashMap<String, String>();
+                try {
+                    lhm1.put("FieldData", fieldData);
+                    lhm1.put("FieldType", fieldData.substring(0, 4));
+                    lhm1.put("FieldType_Value", HexConverter.hexToASCII(fieldData.substring(0, 4)));
+                    lhm1.put("Length", fieldData.substring(4, 8));
+                    lhm1.put("Data", fieldData.substring(8, (Integer.parseInt(fieldData.substring(4, 8)) * 2) + 8));
+                    lhm1.put("Data_Value", HexConverter.hexToASCII(fieldData.substring(8, (Integer.parseInt(fieldData.substring(4, 8)) * 2) + 8)));
+                } catch (Exception ex) {
+                    lhm1.put("MSG_Err", "Index and length must refer to a location within the string");
+                }
+                fieldDatas.add(lhm1);
+            }
+            lhm.put("FieldDatas", fieldDatas);
+            String F_ETX = txtMsgPOS.substring(42 + (txtMsgPOS.length() - 46), 42 + (txtMsgPOS.length() - 46) + 2);
+            lhm.put("ETX", F_ETX);
+            String F_XOR = txtMsgPOS.substring(44 + (txtMsgPOS.length() - 46), 44 + (txtMsgPOS.length() - 46) + 2);
+            lhm.put("XOR", F_XOR);
+            String XORCHK = GetXOR(messagePOS.substring(0, messagePOS.length() - 3));
+
+            lhm.put("XOR_Checked", HexConverter.binaryToHex(XORCHK.substring(0, 4)) + HexConverter.binaryToHex(XORCHK.substring(4, 8)));
+
+        } catch (Exception ex) {
+            ex.printStackTrace();
+        }
+        return lhm;
+    }
+
+    private static String padLeft(int number, String character, String text) {
+        StringBuilder sb = new StringBuilder();
+
+        for (int i = number - text.length(); i > 0; i--) {
+            sb.append(character);
+        }
+
+        sb.append(text);
+        return sb.toString();
+    }
+
+    private static String getLengthData(String text) {
+        text = text.trim().replace(" ", "");
+        String lenData = padLeft(4, "0", String.valueOf((text.length() / 2) + 18));
+        return lenData.substring(0, 2) + " " + lenData.substring(2);
+    }
+
+    private static String GetXOR(String hexString) {
+        try {
+            hexString = hexString.trim().replace(" ", "");
+            hexString = hexString.substring(0, hexString.length());
+
+            String bValue;
+
+            String ckdigit1;
+            String ckdigit2;
+            String ckdigit3;
+            String ckdigit4;
+            String ckdigit5;
+            String ckdigit6;
+            String ckdigit7;
+            String ckdigit8;
+
+            String ckdigitOl1 = "0";
+            String ckdigitOl2 = "0";
+            String ckdigitOl3 = "0";
+            String ckdigitOl4 = "0";
+            String ckdigitOl5 = "0";
+            String ckdigitOl6 = "0";
+            String ckdigitOl7 = "0";
+            String ckdigitOl8 = "0";
+
+            for (int i = 0; i < hexString.length(); i += 2) {
+                String hs = hexString.substring(i, i + 2);
+                bValue = HexConverter.hexStringToBinary(hs);
+                ckdigit1 = bValue.substring(0, 1);
+                ckdigit2 = bValue.substring(1, 2);
+                ckdigit3 = bValue.substring(2, 3);
+                ckdigit4 = bValue.substring(3, 4);
+                ckdigit5 = bValue.substring(4, 5);
+                ckdigit6 = bValue.substring(5, 6);
+                ckdigit7 = bValue.substring(6, 7);
+                ckdigit8 = bValue.substring(7);
+
+                if (ckdigitOl1.equals(ckdigit1)) {
+                    ckdigitOl1 = "0";
+                } else {
+                    ckdigitOl1 = "1";
+                }
+                if (ckdigitOl2.equals(ckdigit2)) {
+                    ckdigitOl2 = "0";
+                } else {
+                    ckdigitOl2 = "1";
+                }
+                if (ckdigitOl3.equals(ckdigit3)) {
+                    ckdigitOl3 = "0";
+                } else {
+                    ckdigitOl3 = "1";
+                }
+                if (ckdigitOl4.equals(ckdigit4)) {
+                    ckdigitOl4 = "0";
+                } else {
+                    ckdigitOl4 = "1";
+                }
+                if (ckdigitOl5.equals(ckdigit5)) {
+                    ckdigitOl5 = "0";
+                } else {
+                    ckdigitOl5 = "1";
+                }
+                if (ckdigitOl6.equals(ckdigit6)) {
+                    ckdigitOl6 = "0";
+                } else {
+                    ckdigitOl6 = "1";
+                }
+                if (ckdigitOl7.equals(ckdigit7)) {
+                    ckdigitOl7 = "0";
+                } else {
+                    ckdigitOl7 = "1";
+                }
+                if (ckdigitOl8.equals(ckdigit8)) {
+                    ckdigitOl8 = "0";
+                } else {
+                    ckdigitOl8 = "1";
+                }
+            }
+            return ckdigitOl1 + ckdigitOl2 + ckdigitOl3 + ckdigitOl4 + ckdigitOl5 + ckdigitOl6 + ckdigitOl7 + ckdigitOl8;
+        } catch (Exception ex) {
+            ex.printStackTrace();
+        }
+        return "";
+    }
+
+}
