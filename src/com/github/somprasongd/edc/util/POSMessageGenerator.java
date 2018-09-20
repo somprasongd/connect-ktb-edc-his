@@ -11,12 +11,16 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  *
  * @author sompr
  */
 public class POSMessageGenerator {
+
+    private static final Logger LOG = Logger.getLogger(POSMessageGenerator.class.getName());
 
     public static String getSaleText(String txCode, double amount,
             String ownerCardNo, String childCardNo, String foreignerCardNo) {
@@ -131,7 +135,7 @@ public class POSMessageGenerator {
         // 92 = re print
         return genText("92", messageData);
     }
-    
+
     public static String getSettlementText() {
         return "02 00 18 30 30 30 30 30 30 30 30 30 30 31 30 35 30 30 30 30 1C 03 32";
     }
@@ -196,8 +200,8 @@ public class POSMessageGenerator {
             lhm.put("TransCode_Value", HexConverter.hexToASCII(H_TransCode));
 
             String H_RespCode = txtMsgPOS.substring(34, 38);//"30 30";
-            lhm.put("RespCode", H_RespCode);
-            lhm.put("RespCode_Value", HexConverter.hexToASCII(H_RespCode));
+            lhm.put("ResponseCode", H_RespCode);
+            lhm.put("ResponseCode_Value", HexConverter.hexToASCII(H_RespCode));
 
             String H_MoreDataIndicator = txtMsgPOS.substring(38, 40);//"30";
             lhm.put("MoreDataIndicator", H_MoreDataIndicator);
@@ -219,6 +223,7 @@ public class POSMessageGenerator {
                     lhm1.put("Data", fieldData.substring(8, (Integer.parseInt(fieldData.substring(4, 8)) * 2) + 8));
                     lhm1.put("Data_Value", HexConverter.hexToASCII(fieldData.substring(8, (Integer.parseInt(fieldData.substring(4, 8)) * 2) + 8)));
                 } catch (Exception ex) {
+                    LOG.log(Level.SEVERE, ex.getMessage(), ex);
                     lhm1.put("MSG_Err", "Index and length must refer to a location within the string");
                 }
                 fieldDatas.add(lhm1);
@@ -233,9 +238,60 @@ public class POSMessageGenerator {
             lhm.put("XOR_Checked", HexConverter.binaryToHex(XORCHK.substring(0, 4)) + HexConverter.binaryToHex(XORCHK.substring(4, 8)));
 
         } catch (Exception ex) {
-            ex.printStackTrace();
+            LOG.log(Level.SEVERE, ex.getMessage(), ex);
         }
         return lhm;
+    }
+
+    /**
+     *
+     * @param messagePOS
+     * @return { error: "if have error", reponse_code: "00 - for completed",
+     * datas: [ {type: "", data: ""} ] * }
+     */
+    public static LinkedHashMap<String, Object> getReponseMessageObject(String messagePOS) {
+        LinkedHashMap<String, Object> lhm = new LinkedHashMap<String, Object>();
+        try {
+            String txtMsgPOS = messagePOS.trim().replace(" ", "");
+
+            String H_ReqRespIndcstor = HexConverter.hexToASCII(txtMsgPOS.substring(28, 30));
+            if (!"1".equals(H_ReqRespIndcstor)) {
+                lhm.put("error", "Not response message");
+                return lhm;
+            }
+
+            String H_RespCode = txtMsgPOS.substring(34, 38);
+            lhm.put("reponse_code", HexConverter.hexToASCII(H_RespCode));
+
+            String F_Data = txtMsgPOS.substring(42, (txtMsgPOS.length() - 46) + 42);
+            String[] F_Datas = F_Data.toLowerCase().split("1c");
+            List<LinkedHashMap<String, String>> fieldDatas = new ArrayList<LinkedHashMap<String, String>>();
+            for (String fdText : F_Datas) {
+                LinkedHashMap<String, String> lhm1 = new LinkedHashMap<String, String>();
+                try {
+                    lhm1.put("type", HexConverter.hexToASCII(fdText.substring(0, 4)));
+                    lhm1.put("data", HexConverter.hexToASCII(fdText.substring(8, (Integer.parseInt(fdText.substring(4, 8)) * 2) + 8)));
+                } catch (Exception ex) {
+                    LOG.log(Level.SEVERE, ex.getMessage(), ex);
+                    lhm1.put("error", "Index and length must refer to a location within the string");
+                }
+                fieldDatas.add(lhm1);
+            }
+            lhm.put("datas", fieldDatas);
+        } catch (Exception ex) {
+            LOG.log(Level.SEVERE, ex.getMessage(), ex);
+        }
+        return lhm;
+    }
+
+    public static String getFieldData(List<LinkedHashMap<String, String>> fieldDatas, String fieldType) {
+        for (LinkedHashMap<String, String> fieldData : fieldDatas) {
+            if (fieldData.get("error") == null
+                    && fieldData.get("type").equals(fieldType)) {
+                return fieldData.get("data");
+            }
+        }
+        return null;
     }
 
     private static String padLeft(int number, String character, String text) {
@@ -335,7 +391,7 @@ public class POSMessageGenerator {
             }
             return ckdigitOl1 + ckdigitOl2 + ckdigitOl3 + ckdigitOl4 + ckdigitOl5 + ckdigitOl6 + ckdigitOl7 + ckdigitOl8;
         } catch (Exception ex) {
-            ex.printStackTrace();
+            LOG.log(Level.SEVERE, ex.getMessage(), ex);
         }
         return "";
     }

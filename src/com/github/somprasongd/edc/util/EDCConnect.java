@@ -14,6 +14,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Observable;
 import java.util.Observer;
@@ -29,9 +30,10 @@ public class EDCConnect implements Observer {
     private static final Logger LOG = Logger.getLogger(EDCConnect.class.getName());
 
     private final OReaderAgency oReaderAgency = new OReaderAgency();
+    private final ONotifyAgency oNotifyAgency = new ONotifyAgency();
 
     public EDCConnect() {
-        addObserver(this);
+        oReaderAgency.addObserver(this);
     }
 
     private SerialPort serialPort;
@@ -86,8 +88,8 @@ public class EDCConnect implements Observer {
         }
     }
 
-    public void addObserver(Observer observer) {
-        oReaderAgency.addObserver(observer);
+    public void addNotifyObserver(Observer observer) {
+        oNotifyAgency.addObserver(observer);
     }
 
     @Override
@@ -96,6 +98,8 @@ public class EDCConnect implements Observer {
         LOG.log(Level.INFO, "Retrieved: {0}", hexString);
         // Send Acknowledge (06 Hex) back to EDC
         sendData("06");
+        LinkedHashMap<String, Object> reponseMessageObject = POSMessageGenerator.getReponseMessageObject(hexString);
+        oNotifyAgency.sendEDCMessage(reponseMessageObject);
     }
 
     public void sendSaleMsg(String txCode, double amount,
@@ -198,6 +202,14 @@ public class EDCConnect implements Observer {
         public void setRetrieveEDCMessage(String edcMsg) {
             setChanged();
             notifyObservers(edcMsg);
+        }
+    }
+
+    private class ONotifyAgency extends Observable {
+
+        public void sendEDCMessage(LinkedHashMap<String, Object> reponseMessageObject) {
+            setChanged();
+            notifyObservers(reponseMessageObject);
         }
     }
 }
