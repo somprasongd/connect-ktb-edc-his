@@ -108,6 +108,16 @@ public class EDCConnect implements Observer {
         this.sendData(saleText);
     }
 
+    public void sendSaleMsgUC(String txCode,
+            double totalAmount,
+            double privilegeAmount,
+            double paidAmount,
+            String ownerCardNo,
+            String visitNumber) {
+        String saleText = POSMessageGenerator.getSaleTextUC(txCode, totalAmount, privilegeAmount, paidAmount, ownerCardNo, visitNumber);
+        this.sendData(saleText);
+    }
+
     public void sendVoidMsg(String invoiceNumber) {
         String saleText = POSMessageGenerator.getVoidText(invoiceNumber);
         this.sendData(saleText);
