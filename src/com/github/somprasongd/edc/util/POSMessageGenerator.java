@@ -25,12 +25,19 @@ public class POSMessageGenerator {
     public static String getSaleText(String txCode, double amount,
             String ownerCardNo, String childCardNo, String foreignerCardNo) {
         if (!isValidSaleTxCode(txCode)) {
+            LOG.warning("invalid transaction code: " + txCode);
             return null;
         }
 
-//        // POS Interface massage spec. V 1.10
-//        if (amount == null || amount.isEmpty()) {
-//            amount = "000000000000";
+        String messageData = "";
+
+        DecimalFormat formatter = new DecimalFormat("#.00");
+        formatter.setRoundingMode(RoundingMode.DOWN);
+        String amountString = formatter.format(amount);
+
+        // POS Interface massage spec. V 1.10
+//        if (amountString == null || amountString.isEmpty()) {
+//            amountString = "000000000000";
 //        }
 //        if (ownerCardNo == null || ownerCardNo.isEmpty()) {
 //            ownerCardNo = "0000000000000";
@@ -41,12 +48,6 @@ public class POSMessageGenerator {
 //        if (foreignerCardNo == null || foreignerCardNo.isEmpty()) {
 //            foreignerCardNo = "B000000000000";
 //        }
-        String messageData = "";
-
-        DecimalFormat formatter = new DecimalFormat("#.00");
-        formatter.setRoundingMode(RoundingMode.DOWN);
-        String amountString = formatter.format(amount);
-
         if (amountString != null && !amountString.isEmpty()) {
             String M_FieldType = "34 30";
             String M_LenFieldData = "00 12";
@@ -75,12 +76,23 @@ public class POSMessageGenerator {
         }
 
         if (ownerCardNo != null && !ownerCardNo.isEmpty()) {
+            // Field 73
             String M_FieldType_Sale73 = "37 33";
             String M_LenFieldData_Sale73 = "00 13";
             String textB_Sale73 = padLeft(13, "0", ownerCardNo);
             String M_Sale73Data = HexConverter.asciiToHexWithSpace(textB_Sale73);
             String M_AmtSeparator_Sale73 = "1C";
             messageData += " " + M_FieldType_Sale73 + " " + M_LenFieldData_Sale73 + " " + M_Sale73Data + " " + M_AmtSeparator_Sale73;
+
+            // Field 74 หาก POS ส่ง Message Type 74 มา EDC จะเอาเลขบัตรจากการอ่าน Chip เทียบกับ Message Type 74 ให้ Reject รายการ
+            if (!ownerCardNo.equals("0000000000000")) {
+                String M_FieldType_Sale74 = "37 34";
+                String M_LenFieldData_Sale74 = "00 13";
+                String textB_Sale74 = padLeft(13, "0", ownerCardNo);
+                String M_Sale74Data = HexConverter.asciiToHexWithSpace(textB_Sale74);
+                String M_AmtSeparator_Sale74 = "1C";
+                messageData += " " + M_FieldType_Sale74 + " " + M_LenFieldData_Sale74 + " " + M_Sale74Data + " " + M_AmtSeparator_Sale74;
+            }
         }
 
         return genText(txCode, messageData);
@@ -104,6 +116,86 @@ public class POSMessageGenerator {
         return Arrays.asList(saleTxCodes).contains(code);
     }
 
+    // สิทธิบัตรทอง from spec v2.13
+    public static String getSaleTextUC(String txCode,
+            double totalAmount,
+            double privilegeAmount,
+            double paidAmount,
+            String ownerCardNo,
+            String visitNumber) {
+        if (!isValidSaleTxCodeUC(txCode)) {
+            LOG.warning("invalid transaction code: " + txCode);
+            return null;
+        }
+
+        String messageData = "";
+
+        DecimalFormat formatter = new DecimalFormat("#.00");
+        formatter.setRoundingMode(RoundingMode.DOWN);
+
+        String totalAmountString = formatter.format(totalAmount);
+        if (totalAmountString != null && !totalAmountString.isEmpty()) {
+            // Field 43
+            String M_FieldType = "34 33";
+            String M_LenFieldData = "00 12";
+            String textB_43 = padLeft(12, "0", totalAmountString.replace(".", ""));
+            String M_AmtData = HexConverter.asciiToHexWithSpace(textB_43);
+            String M_AmtSeparator = "1C";
+            messageData += " " + M_FieldType + " " + M_LenFieldData + " " + M_AmtData + " " + M_AmtSeparator;
+        }
+
+        String privilegeAmountString = formatter.format(privilegeAmount);
+        if (privilegeAmountString != null && !privilegeAmountString.isEmpty()) {
+            // Field 44
+            String M_FieldType = "34 34";
+            String M_LenFieldData = "00 12";
+            String textB_44 = padLeft(12, "0", privilegeAmountString.replace(".", ""));
+            String M_AmtData = HexConverter.asciiToHexWithSpace(textB_44);
+            String M_AmtSeparator = "1C";
+            messageData += " " + M_FieldType + " " + M_LenFieldData + " " + M_AmtData + " " + M_AmtSeparator;
+        }
+
+        String paidAmountString = formatter.format(paidAmount);
+        if (paidAmountString != null && !paidAmountString.isEmpty()) {
+            // Field 45
+            String M_FieldType = "34 35";
+            String M_LenFieldData = "00 12";
+            String textB_45 = padLeft(12, "0", paidAmountString.replace(".", ""));
+            String M_AmtData = HexConverter.asciiToHexWithSpace(textB_45);
+            String M_AmtSeparator = "1C";
+            messageData += " " + M_FieldType + " " + M_LenFieldData + " " + M_AmtData + " " + M_AmtSeparator;
+        }
+
+        if (ownerCardNo != null && !ownerCardNo.isEmpty()) {
+            // Field 74 หาก POS ส่ง Message Type 74 มา EDC จะเอาเลขบัตรจากการอ่าน Chip เทียบกับ Message Type 74 ให้ Reject รายการ
+            String M_FieldType_Sale74 = "37 34";
+            String M_LenFieldData_Sale74 = "00 13";
+            String textB_Sale74 = padLeft(13, "0", ownerCardNo);
+            String M_Sale74Data = HexConverter.asciiToHexWithSpace(textB_Sale74);
+            String M_Separator_Sale74 = "1C";
+            messageData += " " + M_FieldType_Sale74 + " " + M_LenFieldData_Sale74 + " " + M_Sale74Data + " " + M_Separator_Sale74;
+        }
+
+        if (ownerCardNo != null && !ownerCardNo.isEmpty()) {
+            // Field VN
+            String M_FieldType = "56 4E";
+            String M_LenFieldData = "00 13";
+            String textB_VN = padLeft(13, "0", visitNumber);
+            String M_VNData = HexConverter.asciiToHexWithSpace(textB_VN);
+            String M_Separator = "1C";
+            messageData += " " + M_FieldType + " " + M_LenFieldData + " " + M_VNData + " " + M_Separator;
+        }
+
+        return genText(txCode, messageData);
+    }
+
+    private static boolean isValidSaleTxCodeUC(String code) {
+        String[] saleTxCodes = new String[]{
+            "60" // ใช้สิทธิบัตรทอง from spec v2.13
+        };
+        return Arrays.asList(saleTxCodes).contains(code);
+    }
+
     public static String getVoidText(String invoiceNumber) {
         if (invoiceNumber == null || invoiceNumber.isEmpty()) {
             return null;
@@ -116,7 +208,7 @@ public class POSMessageGenerator {
         String M_AmtSeparator_VoidTrace = "1C";
         messageData += " " + M_FieldType_VoidTrace + " " + M_LenFieldData_VoidTrace + " " + M_VoidTraceData + " " + M_AmtSeparator_VoidTrace;
 
-        // 26 = Void
+        // 26 = Void (รายการยกเลิก)
         return genText("26", messageData);
     }
 
@@ -132,7 +224,7 @@ public class POSMessageGenerator {
         String M_AmtSeparator_RePrintTrace = "1C";
         messageData += " " + M_FieldType_RePrintTrace + " " + M_LenFieldData_RePrintTrace + " " + M_RePrintTraceData + " " + M_AmtSeparator_RePrintTrace;
 
-        // 92 = re print
+        // 92 = re print (รายการพิมพ์สลิปซำ้)
         return genText("92", messageData);
     }
 
@@ -149,23 +241,26 @@ public class POSMessageGenerator {
      * @return
      */
     private static String genText(String txCode, String messageData) {
-        String H_STX = "02";
-        String H_Reserve = "30 30 30 30 30 30 30 30 30 30";
-        String H_FormatVer = "31";
-        String H_ReqRespIndcstor = "30"; // 0 = Request
+        String H_STX = "02"; // Fix value "02h" ใช้สำหรับบ่งบอกจุดเริ่มต้นของชุดข้อมูล
+        String H_Reserve = "30 30 30 30 30 30 30 30 30 30"; // Fix value "0000000000" กำหนดไว้เพื่อใช้ในอนาคตหากมีความต้องการ
+        String H_FormatVer = "31"; // Fix value "1" format version
+        String H_ReqRespIndcstor = "30"; // Fix value "0" = Request
         String H_TransCode = HexConverter.asciiToHexWithSpace(txCode);
         String H_RespCode = "30 30";
-        String H_MoreDataIndicator = "30";
-        String H_FieldSeparator = "1C";
+        String H_MoreDataIndicator = "30"; // Fix value "1"
+        String H_FieldSeparator = "1C"; // Fix value "1Ch" ใช้สำหรับคั่นข้อมูลระหว่าง Field
 
-        String T_ETX = "03";
+        String T_ETX = "03"; // Fix value "03h" ใช้สำหรับบ่งบอกจุดสิ้นสุดของชุดข้อมูล
 
         String M_Data = messageData.trim();
 
         String H_Data = H_STX + " " + getLengthData(M_Data) + " " + H_Reserve + " " + H_FormatVer + " " + H_ReqRespIndcstor + " " + H_TransCode + " " + H_RespCode + " " + H_MoreDataIndicator + " " + H_FieldSeparator;
 
         String T_Data = T_ETX;
+
         String XORCHK = GetXOR(H_Data + " " + M_Data + " " + T_Data);
+
+        // LRC (Longitudinal Redundancy Character) ได้มาจากการคำนวณชุดข้อมูลทั้งหมดโดยไม่รวม ETX
         String T_XorStxEtx = HexConverter.binaryToHex(XORCHK.substring(0, 4)) + HexConverter.binaryToHex(XORCHK.substring(4, 8));
 
         String text = H_Data + " " + M_Data + " " + T_Data + " " + T_XorStxEtx;
