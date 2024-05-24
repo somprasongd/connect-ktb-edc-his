@@ -348,6 +348,10 @@ public class POSMessageGenerator {
         LinkedHashMap<String, Object> lhm = new LinkedHashMap<String, Object>();
         try {
             String txtMsgPOS = messagePOS.trim().replace(" ", "");
+            // latest version (24/05/2024) of edc at ladyao hospital send message start with 06
+            if (txtMsgPOS.startsWith("06")) {
+                txtMsgPOS = txtMsgPOS.substring(2);
+            }
 
             String H_ReqRespIndcstor = HexConverter.hexToASCII(txtMsgPOS.substring(28, 30));
             if (!"1".equals(H_ReqRespIndcstor)) {
