@@ -72,14 +72,16 @@ public class EDCConnect implements Observer {
      * 36 30 30 30 1C 36 35 00 06 31 30 30 30 39 38 1C 03 18
      */
     public void sendData(String hexString) {
+        // POSMessageGenerator คืน null เมื่อข้อมูลไม่ถูกต้อง (tx code ผิด, invoice ว่าง, ข้อมูลยาวเกิน spec)
+        if (hexString == null || hexString.trim().isEmpty()) {
+            throw new IllegalArgumentException("Invalid message: cannot generate POS message from the given data");
+        }
+        if (serialPort == null) {
+            throw new IllegalStateException("EDC is not connected");
+        }
         try {
             OutputStream out = serialPort.getOutputStream();
-            String[] split = hexString.split(" ");
-
-            byte[] bs = new byte[split.length];
-            for (int i = 0; i < split.length; i++) {
-                bs[i] = Byte.parseByte(split[i], 16);
-            }
+            byte[] bs = HexConverter.hexWithSpaceToBytes(hexString);
             out.write(bs);
             out.flush();
             out.close();

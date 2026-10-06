@@ -74,6 +74,25 @@ public class HexConverterTest {
         assertEquals(expResult, result);
     }
 
+    /**
+     * Test of hexWithSpaceToBytes method, of class HexConverter. LENGTH แบบ
+     * BCD 80-99 และ LRC อาจเป็น byte 80-FF ได้
+     */
+    @Test
+    public void testHexWithSpaceToBytes() {
+        System.out.println("hexWithSpaceToBytes");
+        byte[] expResult = new byte[]{0x02, 0x00, (byte) 0x89, 0x1C, 0x03, (byte) 0xE3, (byte) 0xFF};
+        byte[] result = HexConverter.hexWithSpaceToBytes("02 00 89 1C 03 E3 FF");
+        assertArrayEquals(expResult, result);
+    }
+
+    @Test
+    public void testHexWithSpaceToBytesSingleByte() {
+        System.out.println("hexWithSpaceToBytesSingleByte");
+        // ACK ที่ส่งกลับ EDC
+        assertArrayEquals(new byte[]{0x06}, HexConverter.hexWithSpaceToBytes("06"));
+    }
+
    
     
 }

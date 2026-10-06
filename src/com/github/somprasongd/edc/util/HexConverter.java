@@ -56,6 +56,19 @@ public class HexConverter {
 //        }
 //        return hex.toString();
 //    }
+    /**
+     * แปลง hex string ที่คั่นด้วยช่องว่าง (เช่น "02 00 89 ... 03 50") เป็น byte[]
+     * รองรับค่า 80-FF ด้วย (Byte.parseByte รับได้แค่ 00-7F)
+     */
+    public static byte[] hexWithSpaceToBytes(String hexString) {
+        String[] split = hexString.trim().split(" ");
+        byte[] bs = new byte[split.length];
+        for (int i = 0; i < split.length; i++) {
+            bs[i] = (byte) Integer.parseInt(split[i], 16);
+        }
+        return bs;
+    }
+
     public static String hexToASCII(String hexString) {
         byte[] txtInByte = new byte[hexString.length() / 2];
         int j = 0;

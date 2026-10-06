@@ -35,6 +35,13 @@ public class POSMessageGenerator {
         formatter.setRoundingMode(RoundingMode.DOWN);
         String amountString = formatter.format(amount);
 
+        if (isTooLong("amount", amountString.replace(".", ""), 12)
+                || isTooLong("ownerCardNo", ownerCardNo, 13)
+                || isTooLong("childCardNo", childCardNo, 13)
+                || isTooLong("foreignerCardNo", foreignerCardNo, 13)) {
+            return null;
+        }
+
         // POS Interface massage spec. V 1.10
 //        if (amountString == null || amountString.isEmpty()) {
 //            amountString = "000000000000";
@@ -134,6 +141,17 @@ public class POSMessageGenerator {
         formatter.setRoundingMode(RoundingMode.DOWN);
 
         String totalAmountString = formatter.format(totalAmount);
+        String privilegeAmountString = formatter.format(privilegeAmount);
+        String paidAmountString = formatter.format(paidAmount);
+
+        if (isTooLong("totalAmount", totalAmountString.replace(".", ""), 12)
+                || isTooLong("privilegeAmount", privilegeAmountString.replace(".", ""), 12)
+                || isTooLong("paidAmount", paidAmountString.replace(".", ""), 12)
+                || isTooLong("ownerCardNo", ownerCardNo, 13)
+                || isTooLong("visitNumber", visitNumber, 13)) {
+            return null;
+        }
+
         if (totalAmountString != null && !totalAmountString.isEmpty()) {
             // Field 43
             String M_FieldType = "34 33";
@@ -144,7 +162,6 @@ public class POSMessageGenerator {
             messageData += " " + M_FieldType + " " + M_LenFieldData + " " + M_AmtData + " " + M_AmtSeparator;
         }
 
-        String privilegeAmountString = formatter.format(privilegeAmount);
         if (privilegeAmountString != null && !privilegeAmountString.isEmpty()) {
             // Field 44
             String M_FieldType = "34 34";
@@ -155,7 +172,6 @@ public class POSMessageGenerator {
             messageData += " " + M_FieldType + " " + M_LenFieldData + " " + M_AmtData + " " + M_AmtSeparator;
         }
 
-        String paidAmountString = formatter.format(paidAmount);
         if (paidAmountString != null && !paidAmountString.isEmpty()) {
             // Field 45
             String M_FieldType = "34 35";
@@ -176,7 +192,7 @@ public class POSMessageGenerator {
             messageData += " " + M_FieldType_Sale74 + " " + M_LenFieldData_Sale74 + " " + M_Sale74Data + " " + M_Separator_Sale74;
         }
 
-        if (ownerCardNo != null && !ownerCardNo.isEmpty()) {
+        if (visitNumber != null && !visitNumber.isEmpty()) {
             // Field VN
             String M_FieldType = "56 4E";
             String M_LenFieldData = "00 13";
@@ -200,6 +216,9 @@ public class POSMessageGenerator {
         if (invoiceNumber == null || invoiceNumber.isEmpty()) {
             return null;
         }
+        if (isTooLong("invoiceNumber", invoiceNumber, 6)) {
+            return null;
+        }
         String messageData = "";
         String M_FieldType_VoidTrace = "36 35";
         String M_LenFieldData_VoidTrace = "00 06";
@@ -216,6 +235,9 @@ public class POSMessageGenerator {
         if (invoiceNumber == null || invoiceNumber.isEmpty()) {
             return null;
         }
+        if (isTooLong("invoiceNumber", invoiceNumber, 6)) {
+            return null;
+        }
         String messageData = "";
         String M_FieldType_RePrintTrace = "36 35";
         String M_LenFieldData_RePrintTrace = "00 06";
@@ -229,7 +251,8 @@ public class POSMessageGenerator {
     }
 
     public static String getSettlementText() {
-        return "02 00 18 30 30 30 30 30 30 30 30 30 30 31 30 35 30 30 30 30 1C 03 32";
+        // 50 = Settlement (รายการโอนยอด), no field data
+        return genText("50", "");
     }
 
     /**
@@ -256,14 +279,23 @@ public class POSMessageGenerator {
 
         String H_Data = H_STX + " " + getLengthData(M_Data) + " " + H_Reserve + " " + H_FormatVer + " " + H_ReqRespIndcstor + " " + H_TransCode + " " + H_RespCode + " " + H_MoreDataIndicator + " " + H_FieldSeparator;
 
+        // ไม่มี Field Data (เช่น Settlement) ต้องไม่ใส่ช่องว่างซ้อน
+        String HM_Data = M_Data.isEmpty() ? H_Data : H_Data + " " + M_Data;
+
         String T_Data = T_ETX;
 
-        String XORCHK = GetXOR(H_Data + " " + M_Data + " " + T_Data);
+        String XORCHK = GetXOR(HM_Data + " " + T_Data);
 
-        // LRC (Longitudinal Redundancy Character) ได้มาจากการคำนวณชุดข้อมูลทั้งหมดโดยไม่รวม ETX
+        // LRC (Longitudinal Redundancy Character) = XOR ทุก byte ตั้งแต่ STX ถึง ETX (รวมทั้ง STX และ ETX)
+        // หลักฐาน: "POS INTERFACE MESSAGE SPECIFICATIONS V1.00_รับชำระ.pdf" (Template 1.00, 05-04-2018)
+        //   หัวข้อ "ตัวอย่างข้อมูลที่ส่ง" Sale 200 บาท ตารางแจกแจง binary แถวสุดท้ายระบุ "Xor STX-ETX" = 13 ซึ่งตรงกับสูตรนี้
+        //   (ไฟล์ PDF อยู่ใน git history: เพิ่มใน commit 106ac42, ลบออกใน f50c5c0)
+        // ข้อความ "โดยไม่รวม ETX" ในเอกสาร (รวมถึงฉบับรักษาพยาบาล V1.10-V2.13) และบรรทัด hex "... 1C 03 11"
+        // ในตัวอย่างเดียวกันไม่ถูกต้อง
+        // ใช้งานจริงกับเครื่อง EDC ได้ด้วยสูตรนี้
         String T_XorStxEtx = HexConverter.binaryToHex(XORCHK.substring(0, 4)) + HexConverter.binaryToHex(XORCHK.substring(4, 8));
 
-        String text = H_Data + " " + M_Data + " " + T_Data + " " + T_XorStxEtx;
+        String text = HM_Data + " " + T_Data + " " + T_XorStxEtx;
         return text;
     }
 
@@ -391,6 +423,19 @@ public class POSMessageGenerator {
             }
         }
         return null;
+    }
+
+    /**
+     * ข้อมูลที่ยาวเกิน Length ที่ spec กำหนดจะทำให้ Length ของ field ไม่ตรงกับข้อมูลจริง
+     * จึงไม่ส่งรายการ (ไม่ตัดทิ้ง เพราะเลขบัตร/VN/invoice ที่ถูกตัดจะกลายเป็นข้อมูลผิด)
+     */
+    private static boolean isTooLong(String fieldName, String value, int maxLength) {
+        if (value != null && value.length() > maxLength) {
+            // ไม่ log ค่าจริง เพราะอาจเป็นเลขบัตรประชาชน
+            LOG.warning(fieldName + " length " + value.length() + " exceeds max " + maxLength);
+            return true;
+        }
+        return false;
     }
 
     private static String padLeft(int number, String character, String text) {
