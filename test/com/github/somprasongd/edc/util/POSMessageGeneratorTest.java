@@ -124,10 +124,11 @@ public class POSMessageGeneratorTest {
     @Test
     public void testGetSaleTextUC() {
         System.out.println("getSaleTextUC");
-        String result = POSMessageGenerator.getSaleTextUC("60", 500, 300, 200, "3333333333333", "6812345");
+        // LENGTH 01 05 = 18 (header) + 17 x 3 (field 43, 44, 45) + 18 x 2 (field 74, VN)
         // field 74 = ownerCardNo, field VN = 0000006812345
-        assertTrue(result.contains("37 34 00 13 33 33 33 33 33 33 33 33 33 33 33 33 33 1C"));
-        assertTrue(result.contains("56 4E 00 13 30 30 30 30 30 30 36 38 31 32 33 34 35 1C"));
+        String expResult = "02 01 05 30 30 30 30 30 30 30 30 30 30 31 30 36 30 30 30 30 1C 34 33 00 12 30 30 30 30 30 30 30 35 30 30 30 30 1C 34 34 00 12 30 30 30 30 30 30 30 33 30 30 30 30 1C 34 35 00 12 30 30 30 30 30 30 30 32 30 30 30 30 1C 37 34 00 13 33 33 33 33 33 33 33 33 33 33 33 33 33 1C 56 4E 00 13 30 30 30 30 30 30 36 38 31 32 33 34 35 1C 03 35";
+        String result = POSMessageGenerator.getSaleTextUC("60", 500, 300, 200, "3333333333333", "6812345");
+        assertEquals(expResult, result);
         assertEquals(xorStxToEtx(result), lastByte(result));
     }
 

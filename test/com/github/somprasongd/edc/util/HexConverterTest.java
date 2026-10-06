@@ -74,6 +74,15 @@ public class HexConverterTest {
         assertEquals(expResult, result);
     }
 
+    @Test
+    public void testHexToASCIIByteAbove7F() {
+        System.out.println("hexToASCIIByteAbove7F");
+        // byte 80-FF ต้องไม่โยน NumberFormatException
+        String result = HexConverter.hexToASCII("31893132");
+        assertTrue(result.startsWith("1"));
+        assertTrue(result.endsWith("12"));
+    }
+
     /**
      * Test of hexWithSpaceToBytes method, of class HexConverter. LENGTH แบบ
      * BCD 80-99 และ LRC อาจเป็น byte 80-FF ได้

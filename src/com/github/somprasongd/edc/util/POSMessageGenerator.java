@@ -22,6 +22,14 @@ public class POSMessageGenerator {
 
     private static final Logger LOG = Logger.getLogger(POSMessageGenerator.class.getName());
 
+    // Length ของ Field Data ตาม spec
+    private static final int AMOUNT_LENGTH = 12;
+    private static final int CARD_NO_LENGTH = 13;
+    private static final int VISIT_NUMBER_LENGTH = 13;
+    private static final int INVOICE_NO_LENGTH = 6;
+
+    private static final String FIELD_SEPARATOR = "1C"; // Fix value "1Ch" ใช้สำหรับคั่นข้อมูลระหว่าง Field
+
     public static String getSaleText(String txCode, double amount,
             String ownerCardNo, String childCardNo, String foreignerCardNo) {
         if (!isValidSaleTxCode(txCode)) {
@@ -29,16 +37,12 @@ public class POSMessageGenerator {
             return null;
         }
 
-        String messageData = "";
+        String amountData = formatAmount(amount);
 
-        DecimalFormat formatter = new DecimalFormat("#.00");
-        formatter.setRoundingMode(RoundingMode.DOWN);
-        String amountString = formatter.format(amount);
-
-        if (isTooLong("amount", amountString.replace(".", ""), 12)
-                || isTooLong("ownerCardNo", ownerCardNo, 13)
-                || isTooLong("childCardNo", childCardNo, 13)
-                || isTooLong("foreignerCardNo", foreignerCardNo, 13)) {
+        if (isTooLong("amount", amountData, AMOUNT_LENGTH)
+                || isTooLong("ownerCardNo", ownerCardNo, CARD_NO_LENGTH)
+                || isTooLong("childCardNo", childCardNo, CARD_NO_LENGTH)
+                || isTooLong("foreignerCardNo", foreignerCardNo, CARD_NO_LENGTH)) {
             return null;
         }
 
@@ -55,54 +59,27 @@ public class POSMessageGenerator {
 //        if (foreignerCardNo == null || foreignerCardNo.isEmpty()) {
 //            foreignerCardNo = "B000000000000";
 //        }
-        if (amountString != null && !amountString.isEmpty()) {
-            String M_FieldType = "34 30";
-            String M_LenFieldData = "00 12";
-            String textB_40 = padLeft(12, "0", amountString.replace(".", ""));
-            String M_AmtData = HexConverter.asciiToHexWithSpace(textB_40);
-            String M_AmtSeparator = "1C";
-            messageData += " " + M_FieldType + " " + M_LenFieldData + " " + M_AmtData + " " + M_AmtSeparator;
+        StringBuilder messageData = new StringBuilder();
+        messageData.append(buildField("40", AMOUNT_LENGTH, amountData));
+
+        if (!isEmpty(childCardNo)) {
+            messageData.append(buildField("71", CARD_NO_LENGTH, childCardNo));
         }
 
-        if (childCardNo != null && !childCardNo.isEmpty()) {
-            String M_FieldType_Sale71 = "37 31";
-            String M_LenFieldData_Sale71 = "00 13";
-            String textB_Sale71 = padLeft(13, "0", childCardNo);
-            String M_Sale71Data = HexConverter.asciiToHexWithSpace(textB_Sale71);
-            String M_AmtSeparator_Sale71 = "1C";
-            messageData += " " + M_FieldType_Sale71 + " " + M_LenFieldData_Sale71 + " " + M_Sale71Data + " " + M_AmtSeparator_Sale71;
+        if (!isEmpty(foreignerCardNo)) {
+            messageData.append(buildField("72", CARD_NO_LENGTH, foreignerCardNo));
         }
 
-        if (foreignerCardNo != null && !foreignerCardNo.isEmpty()) {
-            String M_FieldType_Sale72 = "37 32";
-            String M_LenFieldData_Sale72 = "00 13";
-            String textB_Sale72 = padLeft(13, "0", foreignerCardNo);
-            String M_Sale72Data = HexConverter.asciiToHexWithSpace(textB_Sale72);
-            String M_AmtSeparator_Sale72 = "1C";
-            messageData += " " + M_FieldType_Sale72 + " " + M_LenFieldData_Sale72 + " " + M_Sale72Data + " " + M_AmtSeparator_Sale72;
-        }
-
-        if (ownerCardNo != null && !ownerCardNo.isEmpty()) {
-            // Field 73
-            String M_FieldType_Sale73 = "37 33";
-            String M_LenFieldData_Sale73 = "00 13";
-            String textB_Sale73 = padLeft(13, "0", ownerCardNo);
-            String M_Sale73Data = HexConverter.asciiToHexWithSpace(textB_Sale73);
-            String M_AmtSeparator_Sale73 = "1C";
-            messageData += " " + M_FieldType_Sale73 + " " + M_LenFieldData_Sale73 + " " + M_Sale73Data + " " + M_AmtSeparator_Sale73;
+        if (!isEmpty(ownerCardNo)) {
+            messageData.append(buildField("73", CARD_NO_LENGTH, ownerCardNo));
 
             // Field 74 หาก POS ส่ง Message Type 74 มา EDC จะเอาเลขบัตรจากการอ่าน Chip เทียบกับ Message Type 74 ให้ Reject รายการ
             if (!ownerCardNo.equals("0000000000000")) {
-                String M_FieldType_Sale74 = "37 34";
-                String M_LenFieldData_Sale74 = "00 13";
-                String textB_Sale74 = padLeft(13, "0", ownerCardNo);
-                String M_Sale74Data = HexConverter.asciiToHexWithSpace(textB_Sale74);
-                String M_AmtSeparator_Sale74 = "1C";
-                messageData += " " + M_FieldType_Sale74 + " " + M_LenFieldData_Sale74 + " " + M_Sale74Data + " " + M_AmtSeparator_Sale74;
+                messageData.append(buildField("74", CARD_NO_LENGTH, ownerCardNo));
             }
         }
 
-        return genText(txCode, messageData);
+        return genText(txCode, messageData.toString());
     }
 
     private static boolean isValidSaleTxCode(String code) {
@@ -135,74 +112,33 @@ public class POSMessageGenerator {
             return null;
         }
 
-        String messageData = "";
+        String totalAmountData = formatAmount(totalAmount);
+        String privilegeAmountData = formatAmount(privilegeAmount);
+        String paidAmountData = formatAmount(paidAmount);
 
-        DecimalFormat formatter = new DecimalFormat("#.00");
-        formatter.setRoundingMode(RoundingMode.DOWN);
-
-        String totalAmountString = formatter.format(totalAmount);
-        String privilegeAmountString = formatter.format(privilegeAmount);
-        String paidAmountString = formatter.format(paidAmount);
-
-        if (isTooLong("totalAmount", totalAmountString.replace(".", ""), 12)
-                || isTooLong("privilegeAmount", privilegeAmountString.replace(".", ""), 12)
-                || isTooLong("paidAmount", paidAmountString.replace(".", ""), 12)
-                || isTooLong("ownerCardNo", ownerCardNo, 13)
-                || isTooLong("visitNumber", visitNumber, 13)) {
+        if (isTooLong("totalAmount", totalAmountData, AMOUNT_LENGTH)
+                || isTooLong("privilegeAmount", privilegeAmountData, AMOUNT_LENGTH)
+                || isTooLong("paidAmount", paidAmountData, AMOUNT_LENGTH)
+                || isTooLong("ownerCardNo", ownerCardNo, CARD_NO_LENGTH)
+                || isTooLong("visitNumber", visitNumber, VISIT_NUMBER_LENGTH)) {
             return null;
         }
 
-        if (totalAmountString != null && !totalAmountString.isEmpty()) {
-            // Field 43
-            String M_FieldType = "34 33";
-            String M_LenFieldData = "00 12";
-            String textB_43 = padLeft(12, "0", totalAmountString.replace(".", ""));
-            String M_AmtData = HexConverter.asciiToHexWithSpace(textB_43);
-            String M_AmtSeparator = "1C";
-            messageData += " " + M_FieldType + " " + M_LenFieldData + " " + M_AmtData + " " + M_AmtSeparator;
-        }
+        StringBuilder messageData = new StringBuilder();
+        messageData.append(buildField("43", AMOUNT_LENGTH, totalAmountData));
+        messageData.append(buildField("44", AMOUNT_LENGTH, privilegeAmountData));
+        messageData.append(buildField("45", AMOUNT_LENGTH, paidAmountData));
 
-        if (privilegeAmountString != null && !privilegeAmountString.isEmpty()) {
-            // Field 44
-            String M_FieldType = "34 34";
-            String M_LenFieldData = "00 12";
-            String textB_44 = padLeft(12, "0", privilegeAmountString.replace(".", ""));
-            String M_AmtData = HexConverter.asciiToHexWithSpace(textB_44);
-            String M_AmtSeparator = "1C";
-            messageData += " " + M_FieldType + " " + M_LenFieldData + " " + M_AmtData + " " + M_AmtSeparator;
-        }
-
-        if (paidAmountString != null && !paidAmountString.isEmpty()) {
-            // Field 45
-            String M_FieldType = "34 35";
-            String M_LenFieldData = "00 12";
-            String textB_45 = padLeft(12, "0", paidAmountString.replace(".", ""));
-            String M_AmtData = HexConverter.asciiToHexWithSpace(textB_45);
-            String M_AmtSeparator = "1C";
-            messageData += " " + M_FieldType + " " + M_LenFieldData + " " + M_AmtData + " " + M_AmtSeparator;
-        }
-
-        if (ownerCardNo != null && !ownerCardNo.isEmpty()) {
+        if (!isEmpty(ownerCardNo)) {
             // Field 74 หาก POS ส่ง Message Type 74 มา EDC จะเอาเลขบัตรจากการอ่าน Chip เทียบกับ Message Type 74 ให้ Reject รายการ
-            String M_FieldType_Sale74 = "37 34";
-            String M_LenFieldData_Sale74 = "00 13";
-            String textB_Sale74 = padLeft(13, "0", ownerCardNo);
-            String M_Sale74Data = HexConverter.asciiToHexWithSpace(textB_Sale74);
-            String M_Separator_Sale74 = "1C";
-            messageData += " " + M_FieldType_Sale74 + " " + M_LenFieldData_Sale74 + " " + M_Sale74Data + " " + M_Separator_Sale74;
+            messageData.append(buildField("74", CARD_NO_LENGTH, ownerCardNo));
         }
 
-        if (visitNumber != null && !visitNumber.isEmpty()) {
-            // Field VN
-            String M_FieldType = "56 4E";
-            String M_LenFieldData = "00 13";
-            String textB_VN = padLeft(13, "0", visitNumber);
-            String M_VNData = HexConverter.asciiToHexWithSpace(textB_VN);
-            String M_Separator = "1C";
-            messageData += " " + M_FieldType + " " + M_LenFieldData + " " + M_VNData + " " + M_Separator;
+        if (!isEmpty(visitNumber)) {
+            messageData.append(buildField("VN", VISIT_NUMBER_LENGTH, visitNumber));
         }
 
-        return genText(txCode, messageData);
+        return genText(txCode, messageData.toString());
     }
 
     private static boolean isValidSaleTxCodeUC(String code) {
@@ -213,41 +149,19 @@ public class POSMessageGenerator {
     }
 
     public static String getVoidText(String invoiceNumber) {
-        if (invoiceNumber == null || invoiceNumber.isEmpty()) {
+        if (isEmpty(invoiceNumber) || isTooLong("invoiceNumber", invoiceNumber, INVOICE_NO_LENGTH)) {
             return null;
         }
-        if (isTooLong("invoiceNumber", invoiceNumber, 6)) {
-            return null;
-        }
-        String messageData = "";
-        String M_FieldType_VoidTrace = "36 35";
-        String M_LenFieldData_VoidTrace = "00 06";
-        String textB_VoidTrace = padLeft(6, "0", invoiceNumber);
-        String M_VoidTraceData = HexConverter.asciiToHexWithSpace(textB_VoidTrace);
-        String M_AmtSeparator_VoidTrace = "1C";
-        messageData += " " + M_FieldType_VoidTrace + " " + M_LenFieldData_VoidTrace + " " + M_VoidTraceData + " " + M_AmtSeparator_VoidTrace;
-
         // 26 = Void (รายการยกเลิก)
-        return genText("26", messageData);
+        return genText("26", buildField("65", INVOICE_NO_LENGTH, invoiceNumber));
     }
 
     public static String getRePrintText(String invoiceNumber) {
-        if (invoiceNumber == null || invoiceNumber.isEmpty()) {
+        if (isEmpty(invoiceNumber) || isTooLong("invoiceNumber", invoiceNumber, INVOICE_NO_LENGTH)) {
             return null;
         }
-        if (isTooLong("invoiceNumber", invoiceNumber, 6)) {
-            return null;
-        }
-        String messageData = "";
-        String M_FieldType_RePrintTrace = "36 35";
-        String M_LenFieldData_RePrintTrace = "00 06";
-        String textB_RePrintTrace = padLeft(6, "0", invoiceNumber);
-        String M_RePrintTraceData = HexConverter.asciiToHexWithSpace(textB_RePrintTrace);
-        String M_AmtSeparator_RePrintTrace = "1C";
-        messageData += " " + M_FieldType_RePrintTrace + " " + M_LenFieldData_RePrintTrace + " " + M_RePrintTraceData + " " + M_AmtSeparator_RePrintTrace;
-
-        // 92 = re print (รายการพิมพ์สลิปซำ้)
-        return genText("92", messageData);
+        // 92 = re print (รายการพิมพ์สลิปซ้ำ)
+        return genText("92", buildField("65", INVOICE_NO_LENGTH, invoiceNumber));
     }
 
     public static String getSettlementText() {
@@ -271,7 +185,7 @@ public class POSMessageGenerator {
         String H_TransCode = HexConverter.asciiToHexWithSpace(txCode);
         String H_RespCode = "30 30";
         String H_MoreDataIndicator = "30"; // Fix value "1"
-        String H_FieldSeparator = "1C"; // Fix value "1Ch" ใช้สำหรับคั่นข้อมูลระหว่าง Field
+        String H_FieldSeparator = FIELD_SEPARATOR;
 
         String T_ETX = "03"; // Fix value "03h" ใช้สำหรับบ่งบอกจุดสิ้นสุดของชุดข้อมูล
 
@@ -284,8 +198,6 @@ public class POSMessageGenerator {
 
         String T_Data = T_ETX;
 
-        String XORCHK = GetXOR(HM_Data + " " + T_Data);
-
         // LRC (Longitudinal Redundancy Character) = XOR ทุก byte ตั้งแต่ STX ถึง ETX (รวมทั้ง STX และ ETX)
         // หลักฐาน: "POS INTERFACE MESSAGE SPECIFICATIONS V1.00_รับชำระ.pdf" (Template 1.00, 05-04-2018)
         //   หัวข้อ "ตัวอย่างข้อมูลที่ส่ง" Sale 200 บาท ตารางแจกแจง binary แถวสุดท้ายระบุ "Xor STX-ETX" = 13 ซึ่งตรงกับสูตรนี้
@@ -293,7 +205,7 @@ public class POSMessageGenerator {
         // ข้อความ "โดยไม่รวม ETX" ในเอกสาร (รวมถึงฉบับรักษาพยาบาล V1.10-V2.13) และบรรทัด hex "... 1C 03 11"
         // ในตัวอย่างเดียวกันไม่ถูกต้อง
         // ใช้งานจริงกับเครื่อง EDC ได้ด้วยสูตรนี้
-        String T_XorStxEtx = HexConverter.binaryToHex(XORCHK.substring(0, 4)) + HexConverter.binaryToHex(XORCHK.substring(4, 8));
+        String T_XorStxEtx = lrc(HM_Data + " " + T_Data);
 
         String text = HM_Data + " " + T_Data + " " + T_XorStxEtx;
         return text;
@@ -360,9 +272,7 @@ public class POSMessageGenerator {
             lhm.put("ETX", F_ETX);
             String F_XOR = txtMsgPOS.substring(44 + (txtMsgPOS.length() - 46), 44 + (txtMsgPOS.length() - 46) + 2);
             lhm.put("XOR", F_XOR);
-            String XORCHK = GetXOR(messagePOS.substring(0, messagePOS.length() - 3));
-
-            lhm.put("XOR_Checked", HexConverter.binaryToHex(XORCHK.substring(0, 4)) + HexConverter.binaryToHex(XORCHK.substring(4, 8)));
+            lhm.put("XOR_Checked", lrc(messagePOS.substring(0, messagePOS.length() - 3)));
 
         } catch (Exception ex) {
             LOG.log(Level.SEVERE, ex.getMessage(), ex);
@@ -438,6 +348,34 @@ public class POSMessageGenerator {
         return false;
     }
 
+    private static boolean isEmpty(String value) {
+        return value == null || value.isEmpty();
+    }
+
+    // ทศนิยม 2 หลักแบบปัดทิ้ง แล้วตัดจุดออก เช่น 20.50 -> "2050"
+    private static String formatAmount(double amount) {
+        DecimalFormat formatter = new DecimalFormat("#.00");
+        formatter.setRoundingMode(RoundingMode.DOWN);
+        return formatter.format(amount).replace(".", "");
+    }
+
+    /**
+     * Field Type (2) + Length (2, BCD) + Data (เติม '0' ด้านหน้าให้ครบ Length) +
+     * Field Separator (1Ch)
+     */
+    private static String buildField(String fieldType, int length, String data) {
+        return " " + HexConverter.asciiToHexWithSpace(fieldType).toUpperCase()
+                + " " + toBcdLength(length)
+                + " " + HexConverter.asciiToHexWithSpace(padLeft(length, "0", data))
+                + " " + FIELD_SEPARATOR;
+    }
+
+    // ความยาว 2 bytes แบบ BCD เช่น 256 -> "02 56"
+    private static String toBcdLength(int length) {
+        String lenData = padLeft(4, "0", String.valueOf(length));
+        return lenData.substring(0, 2) + " " + lenData.substring(2);
+    }
+
     private static String padLeft(int number, String character, String text) {
         StringBuilder sb = new StringBuilder();
 
@@ -451,93 +389,21 @@ public class POSMessageGenerator {
 
     private static String getLengthData(String text) {
         text = text.trim().replace(" ", "");
-        String lenData = padLeft(4, "0", String.valueOf((text.length() / 2) + 18));
-        return lenData.substring(0, 2) + " " + lenData.substring(2);
+        // 18 = Reserve (10) + Presentation Header (8)
+        return toBcdLength((text.length() / 2) + 18);
     }
 
-    private static String GetXOR(String hexString) {
-        try {
-            hexString = hexString.trim().replace(" ", "");
-            hexString = hexString.substring(0, hexString.length());
-
-            String bValue;
-
-            String ckdigit1;
-            String ckdigit2;
-            String ckdigit3;
-            String ckdigit4;
-            String ckdigit5;
-            String ckdigit6;
-            String ckdigit7;
-            String ckdigit8;
-
-            String ckdigitOl1 = "0";
-            String ckdigitOl2 = "0";
-            String ckdigitOl3 = "0";
-            String ckdigitOl4 = "0";
-            String ckdigitOl5 = "0";
-            String ckdigitOl6 = "0";
-            String ckdigitOl7 = "0";
-            String ckdigitOl8 = "0";
-
-            for (int i = 0; i < hexString.length(); i += 2) {
-                String hs = hexString.substring(i, i + 2);
-                bValue = HexConverter.hexStringToBinary(hs);
-                ckdigit1 = bValue.substring(0, 1);
-                ckdigit2 = bValue.substring(1, 2);
-                ckdigit3 = bValue.substring(2, 3);
-                ckdigit4 = bValue.substring(3, 4);
-                ckdigit5 = bValue.substring(4, 5);
-                ckdigit6 = bValue.substring(5, 6);
-                ckdigit7 = bValue.substring(6, 7);
-                ckdigit8 = bValue.substring(7);
-
-                if (ckdigitOl1.equals(ckdigit1)) {
-                    ckdigitOl1 = "0";
-                } else {
-                    ckdigitOl1 = "1";
-                }
-                if (ckdigitOl2.equals(ckdigit2)) {
-                    ckdigitOl2 = "0";
-                } else {
-                    ckdigitOl2 = "1";
-                }
-                if (ckdigitOl3.equals(ckdigit3)) {
-                    ckdigitOl3 = "0";
-                } else {
-                    ckdigitOl3 = "1";
-                }
-                if (ckdigitOl4.equals(ckdigit4)) {
-                    ckdigitOl4 = "0";
-                } else {
-                    ckdigitOl4 = "1";
-                }
-                if (ckdigitOl5.equals(ckdigit5)) {
-                    ckdigitOl5 = "0";
-                } else {
-                    ckdigitOl5 = "1";
-                }
-                if (ckdigitOl6.equals(ckdigit6)) {
-                    ckdigitOl6 = "0";
-                } else {
-                    ckdigitOl6 = "1";
-                }
-                if (ckdigitOl7.equals(ckdigit7)) {
-                    ckdigitOl7 = "0";
-                } else {
-                    ckdigitOl7 = "1";
-                }
-                if (ckdigitOl8.equals(ckdigit8)) {
-                    ckdigitOl8 = "0";
-                } else {
-                    ckdigitOl8 = "1";
-                }
-            }
-            return ckdigitOl1 + ckdigitOl2 + ckdigitOl3 + ckdigitOl4 + ckdigitOl5 + ckdigitOl6 + ckdigitOl7 + ckdigitOl8;
-        } catch (Exception ex) {
-            LOG.log(Level.SEVERE, ex.getMessage(), ex);
+    /**
+     * XOR ทุก byte ของ hex string (คั่นด้วยช่องว่างหรือไม่ก็ได้) คืนค่าเป็น hex 2
+     * หลักตัวพิมพ์ใหญ่
+     */
+    private static String lrc(String hexString) {
+        String hex = hexString.trim().replace(" ", "");
+        int lrc = 0;
+        for (int i = 0; i < hex.length(); i += 2) {
+            lrc ^= Integer.parseInt(hex.substring(i, i + 2), 16);
         }
-        return "";
+        return String.format("%02X", lrc);
     }
 
 }

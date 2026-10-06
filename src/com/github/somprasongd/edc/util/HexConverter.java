@@ -73,7 +73,7 @@ public class HexConverter {
         byte[] txtInByte = new byte[hexString.length() / 2];
         int j = 0;
         for (int i = 0; i < hexString.length(); i += 2) {
-            txtInByte[j++] = Byte.parseByte(hexString.substring(i, i + 2), 16);
+            txtInByte[j++] = (byte) Integer.parseInt(hexString.substring(i, i + 2), 16);
         }
         return new String(txtInByte);
     }
