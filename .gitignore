@@ -1,3 +1,32 @@
+# NetBeans / Ant build output
 /build/
 /dist/
 /nbproject/private/
+
+# Editor backup files (เช่น nbproject/build-impl.xml~)
+*~
+*.bak
+*.swp
+
+# Java
+*.class
+*.log
+hs_err_pid*
+
+# IDE อื่นๆ (โปรเจกต์นี้ใช้ NetBeans)
+.idea/
+*.iml
+.vscode/
+.settings/
+.classpath
+.project
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Windows
+Thumbs.db
+desktop.ini
