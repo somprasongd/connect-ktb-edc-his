@@ -3,6 +3,9 @@
 /dist/
 /nbproject/private/
 
+# เอกสาร spec ภายใน (ห้ามขึ้น public repo)
+/docs/internal/
+
 # Editor backup files (เช่น nbproject/build-impl.xml~)
 *~
 *.bak

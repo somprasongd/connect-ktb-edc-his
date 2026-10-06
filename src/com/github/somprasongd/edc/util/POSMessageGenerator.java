@@ -199,11 +199,8 @@ public class POSMessageGenerator {
         String T_Data = T_ETX;
 
         // LRC (Longitudinal Redundancy Character) = XOR ทุก byte ตั้งแต่ STX ถึง ETX (รวมทั้ง STX และ ETX)
-        // หลักฐาน: "POS INTERFACE MESSAGE SPECIFICATIONS V1.00_รับชำระ.pdf" (Template 1.00, 05-04-2018)
-        //   หัวข้อ "ตัวอย่างข้อมูลที่ส่ง" Sale 200 บาท ตารางแจกแจง binary แถวสุดท้ายระบุ "Xor STX-ETX" = 13 ซึ่งตรงกับสูตรนี้
-        //   (ไฟล์ PDF อยู่ใน git history: เพิ่มใน commit 106ac42, ลบออกใน f50c5c0)
-        // ข้อความ "โดยไม่รวม ETX" ในเอกสาร (รวมถึงฉบับรักษาพยาบาล V1.10-V2.13) และบรรทัด hex "... 1C 03 11"
-        // ในตัวอย่างเดียวกันไม่ถูกต้อง
+        // หลักฐาน: ตัวอย่าง Sale 200 บาทในเอกสาร spec V1.00 ตารางแจกแจง binary แถว "Xor STX-ETX" = 13 ซึ่งตรงกับสูตรนี้
+        // ข้อความ "โดยไม่รวม ETX" ในเอกสาร spec และบรรทัด hex "... 1C 03 11" ในตัวอย่างเดียวกันไม่ถูกต้อง
         // ใช้งานจริงกับเครื่อง EDC ได้ด้วยสูตรนี้
         String T_XorStxEtx = lrc(HM_Data + " " + T_Data);
 
